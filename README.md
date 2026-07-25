@@ -172,6 +172,9 @@ $ sudo install -Dm0644 contrib/systemd/system/btrfs-headroom.service \
     /usr/lib/systemd/system/btrfs-headroom.service
 $ sudo install -Dm0644 contrib/systemd/system/btrfs-headroom.timer \
     /usr/lib/systemd/system/btrfs-headroom.timer
+$ sudo install -Dm0644 contrib/sysusers/btrfs-headroom.conf \
+    /usr/lib/sysusers.d/btrfs-headroom.conf
+$ sudo systemd-sysusers
 $ sudo systemctl daemon-reload
 $ sudo systemctl enable --now btrfs-headroom.timer
 ```
@@ -184,8 +187,10 @@ $ journalctl -u btrfs-headroom.service
 $ jq . /run/btrfs-headroom/status.json
 ```
 
-The unit uses `DynamicUser=yes`, an empty capability set, a private device
-namespace, and a read-only system view. It reads `/proc/1/mountinfo` so its
+The unit uses a dedicated unprivileged system user, an empty capability set, a
+private device namespace, and a read-only system view. A static identity keeps
+the published runtime directory traversable by local consumers; no login shell
+or writable home is assigned. The service reads `/proc/1/mountinfo` so its
 hardening namespace is not mistaken for a read-only host filesystem. It never
 runs as root. Installation, hardening details, output visibility, and the
 optional desktop notifier are covered in

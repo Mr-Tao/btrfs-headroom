@@ -39,11 +39,12 @@ in the destination directory.
 
 ## systemd boundary
 
-The supplied system service uses a dynamic identity and an empty capability
-set. It receives a private device namespace and a read-only view of the host
-filesystem except for its managed runtime directory. Network access, new
-privileges, writable executable memory, kernel tunables, kernel modules,
-control groups, and broad namespace creation are restricted.
+The supplied system service uses a dedicated unprivileged system identity and
+an empty capability set. The account has no login shell or writable home. It
+receives a private device namespace and a read-only view of the host filesystem
+except for its managed runtime directory. Network access, new privileges,
+writable executable memory, kernel tunables, kernel modules, control groups,
+and broad namespace creation are restricted.
 
 The unit writes:
 
@@ -64,6 +65,10 @@ service intentionally uses `UMask=0022`: the report is rendered through a
 private temporary file and atomically published as mode `0644`, and the ready
 marker is created as `0644` only after the report is readable. The user
 notifier keeps its separate `UMask=0077` for per-user state.
+
+A static system identity is intentional here. `DynamicUser=yes` would place
+the runtime directory below root-only `/run/private`, preventing ordinary
+desktop users from traversing the path to this deliberately shared report.
 
 `status.json` can reveal filesystem UUIDs, mountpoints, and device paths. On
 systems where that inventory is sensitive, omit the user notifier and replace

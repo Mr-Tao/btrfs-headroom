@@ -19,6 +19,9 @@ $ sudo install -Dm0644 contrib/systemd/system/btrfs-headroom.service \
     /usr/lib/systemd/system/btrfs-headroom.service
 $ sudo install -Dm0644 contrib/systemd/system/btrfs-headroom.timer \
     /usr/lib/systemd/system/btrfs-headroom.timer
+$ sudo install -Dm0644 contrib/sysusers/btrfs-headroom.conf \
+    /usr/lib/sysusers.d/btrfs-headroom.conf
+$ sudo systemd-sysusers
 $ sudo systemctl daemon-reload
 $ sudo systemctl enable --now btrfs-headroom.timer
 ```
@@ -72,7 +75,8 @@ Flags must precede mountpoints.
 
 The service uses:
 
-- `DynamicUser=yes`;
+- a dedicated `btrfs-headroom` system user with no login shell or writable
+  home;
 - empty capability and ambient-capability sets;
 - `NoNewPrivileges=yes`;
 - private device, network, and temporary-filesystem namespaces;
@@ -85,9 +89,14 @@ The service uses:
 `ProtectSystem=strict` makes the service's own `/` mount appear read-only.
 Read-only health must describe the host, not that private mount namespace, so
 the unit passes `--mountinfo /proc/1/mountinfo`. It intentionally does not set
-`ProtectProc=invisible`, which would hide PID 1 from the dynamic user.
+`ProtectProc=invisible`, which would hide PID 1 from the service user.
 `ProcSubset=pid` remains enabled; the service receives no access to process
 memory, block devices, or additional capabilities.
+
+The account is static because systemd deliberately places runtime directories
+owned by `DynamicUser=yes` below root-only `/run/private`. That protects
+private service state, but it would also make the intentionally shared status
+file unreachable by the desktop notifier despite its `0644` mode.
 
 Do not add `User=root`, `CAP_SYS_ADMIN`, access to block devices, or a writable
 system view to work around a collection failure. File permissions or an older

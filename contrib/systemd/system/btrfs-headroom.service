@@ -8,7 +8,8 @@ ConditionPathIsReadWrite=/run
 
 [Service]
 Type=oneshot
-DynamicUser=yes
+User=btrfs-headroom
+Group=btrfs-headroom
 ExecStartPre=-/usr/bin/rm -f /run/btrfs-headroom/status.json
 ExecStart=/usr/bin/btrfs-headroom scan --mountinfo /proc/1/mountinfo --format json --output /run/btrfs-headroom/status.json
 ExecStartPost=/usr/bin/chmod 0644 /run/btrfs-headroom/status.json
