@@ -142,7 +142,8 @@ The notifier:
   changes;
 - emits one recovery notification when health returns to OK;
 - stores only a digest, severity, and notification ID below
-  `$XDG_RUNTIME_DIR`.
+  `$XDG_RUNTIME_DIR`, preserving them across scans until the user manager
+  exits.
 
 Disable it without affecting collection:
 

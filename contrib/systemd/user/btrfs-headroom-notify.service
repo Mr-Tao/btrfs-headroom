@@ -12,6 +12,7 @@ ExecStart=/usr/lib/btrfs-headroom/btrfs-headroom-notify /run/btrfs-headroom/stat
 
 RuntimeDirectory=btrfs-headroom-notify
 RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
 UMask=0077
 
 CapabilityBoundingSet=
