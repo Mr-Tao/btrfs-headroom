@@ -74,8 +74,10 @@ package() {
 
   install -Dm0644 README.md CONTRIBUTING.md \
     -t "$pkgdir/usr/share/doc/btrfs-headroom"
-  install -Dm0644 docs/policy.md docs/security.md contrib/systemd/README.md \
+  install -Dm0644 docs/policy.md docs/security.md \
     -t "$pkgdir/usr/share/doc/btrfs-headroom"
+  install -Dm0644 contrib/systemd/README.md \
+    "$pkgdir/usr/share/doc/btrfs-headroom/systemd.md"
 
   install -Dm0644 LICENSE LICENSE-APACHE LICENSE-MIT \
     -t "$pkgdir/usr/share/licenses/$pkgname"
