@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+
+[Unit]
+Description=Notify the desktop about Btrfs headroom changes
+Documentation=https://github.com/Mr-Tao/btrfs-headroom
+After=graphical-session.target
+ConditionPathExists=/run/btrfs-headroom/status.json
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/btrfs-headroom/btrfs-headroom-notify /run/btrfs-headroom/status.json
+
+RuntimeDirectory=btrfs-headroom-notify
+RuntimeDirectoryMode=0700
+UMask=0077
+
+CapabilityBoundingSet=
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+NoNewPrivileges=yes
+PrivateDevices=yes
+PrivateTmp=yes
+ProtectClock=yes
+ProtectControlGroups=yes
+ProtectHome=read-only
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectSystem=strict
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+SystemCallErrorNumber=EPERM
+SystemCallFilter=@system-service

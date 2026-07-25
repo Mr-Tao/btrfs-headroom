@@ -1,0 +1,19 @@
+btrfs-headroom is dual-licensed under your choice of:
+
+  * Apache License, Version 2.0 (LICENSE-APACHE), or
+  * MIT License (LICENSE-MIT).
+
+Unless you explicitly state otherwise, any contribution intentionally
+submitted for inclusion in this project is licensed under the same terms,
+without additional conditions.
+
+The SPDX license expression for the project is:
+
+    Apache-2.0 OR MIT
+
+Use this exact per-file identifier where the file format supports comments:
+
+    SPDX-License-Identifier: Apache-2.0 OR MIT
+
+The SPDX expression uses "OR", so recipients may comply with either license.
+It does not require compliance with both licenses simultaneously.

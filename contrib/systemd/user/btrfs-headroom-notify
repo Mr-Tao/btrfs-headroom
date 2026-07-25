@@ -1,0 +1,151 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+
+set -eu
+
+status_file=${1:-/run/btrfs-headroom/status.json}
+runtime_dir=${XDG_RUNTIME_DIR:?XDG_RUNTIME_DIR is not set}
+state_dir=$runtime_dir/btrfs-headroom-notify
+state_file=$state_dir/state
+notification_id_file=$state_dir/notification-id
+
+mkdir -p "$state_dir"
+chmod 0700 "$state_dir"
+
+severity=$(
+	jq -er '
+		.reports as $reports
+		| if .schema != "org.btrfs-headroom.report/v1"
+		   or ($reports | type) != "array"
+		   or ($reports | length) == 0
+		then
+			error("unsupported btrfs-headroom report")
+		elif any(
+			$reports[];
+			.health.severity as $severity
+			| ["ok", "unknown", "warning", "critical"]
+			| index($severity) == null
+		)
+		then
+			error("unsupported btrfs-headroom severity")
+		else
+			[$reports[].health.severity]
+			| if index("critical") then "critical"
+			  elif index("warning") then "warning"
+			  elif index("unknown") then "unknown"
+			  else "ok"
+			  end
+		end
+	' "$status_file"
+)
+
+if [ "$severity" = "ok" ]; then
+	body="All observed Btrfs filesystems are healthy."
+else
+	body=$(
+		jq -r --arg severity "$severity" '
+			first(
+				.reports[]
+				| select(.health.severity == $severity)
+				| . as $report
+				| (
+					$report.health.reasons
+					| map(select(.severity == $severity))
+					| .[0].summary
+					// ("Health state is " + $severity)
+				  ) as $reason
+				| (
+					$report.observation.filesystem.mountpoints[0]
+					// $report.observation.filesystem.fsid
+				  ) + ": " + $reason
+			) // ("Btrfs health is " + $severity)
+		' "$status_file"
+	)
+fi
+
+digest=$(printf '%s\000%s' "$severity" "$body" | sha256sum)
+digest=${digest%% *}
+
+previous_severity=
+previous_digest=
+if [ -r "$state_file" ]; then
+	IFS=' ' read -r previous_severity previous_digest <"$state_file" || :
+fi
+
+write_state() {
+	tmp=$state_file.tmp.$$
+	printf '%s %s\n' "$severity" "$digest" >"$tmp"
+	mv -f "$tmp" "$state_file"
+}
+
+if [ "$severity" = "$previous_severity" ] &&
+	[ "$digest" = "$previous_digest" ]; then
+	exit 0
+fi
+
+if [ -z "$previous_severity" ] && [ "$severity" = "ok" ]; then
+	write_state
+	exit 0
+fi
+
+case $severity in
+critical)
+	title="Btrfs headroom critical"
+	urgency=critical
+	icon=dialog-error
+	timeout=0
+	;;
+warning)
+	title="Btrfs headroom warning"
+	urgency=normal
+	icon=dialog-warning
+	timeout=12000
+	;;
+unknown)
+	title="Btrfs headroom unknown"
+	urgency=normal
+	icon=dialog-question
+	timeout=12000
+	;;
+ok)
+	title="Btrfs headroom recovered"
+	urgency=low
+	icon=drive-harddisk
+	timeout=6000
+	;;
+esac
+
+old_id=
+if [ -r "$notification_id_file" ]; then
+	IFS= read -r old_id <"$notification_id_file" || :
+	case $old_id in
+	'' | *[!0-9]*) old_id= ;;
+	esac
+fi
+
+if [ -n "$old_id" ]; then
+	new_id=$(
+		notify-send --print-id --replace-id="$old_id" \
+			--app-name=btrfs-headroom \
+			--urgency="$urgency" \
+			--expire-time="$timeout" \
+			--icon="$icon" \
+			"$title" "$body"
+	)
+else
+	new_id=$(
+		notify-send --print-id \
+			--app-name=btrfs-headroom \
+			--urgency="$urgency" \
+			--expire-time="$timeout" \
+			--icon="$icon" \
+			"$title" "$body"
+	)
+fi
+
+case $new_id in
+'' | *[!0-9]*) ;;
+*) printf '%s\n' "$new_id" >"$notification_id_file" ;;
+esac
+
+write_state

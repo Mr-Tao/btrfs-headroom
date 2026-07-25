@@ -1,0 +1,52 @@
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+
+[Unit]
+Description=Inspect Btrfs allocator headroom
+Documentation=https://github.com/Mr-Tao/btrfs-headroom
+After=local-fs.target
+ConditionPathIsReadWrite=/run
+
+[Service]
+Type=oneshot
+DynamicUser=yes
+ExecStartPre=-/usr/bin/rm -f /run/btrfs-headroom/status.json
+ExecStart=/usr/bin/btrfs-headroom scan --mountinfo /proc/1/mountinfo --format json --output /run/btrfs-headroom/status.json
+ExecStartPost=/usr/bin/chmod 0644 /run/btrfs-headroom/status.json
+ExecStartPost=/usr/bin/touch /run/btrfs-headroom/status.ready
+
+RuntimeDirectory=btrfs-headroom
+RuntimeDirectoryMode=0755
+RuntimeDirectoryPreserve=yes
+UMask=0022
+
+CapabilityBoundingSet=
+AmbientCapabilities=
+DevicePolicy=closed
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+NoNewPrivileges=yes
+PrivateDevices=yes
+PrivateNetwork=yes
+PrivateTmp=yes
+ProcSubset=pid
+ProtectClock=yes
+ProtectControlGroups=yes
+ProtectHome=read-only
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectSystem=strict
+RemoveIPC=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+SystemCallErrorNumber=EPERM
+SystemCallFilter=@system-service
+ReadWritePaths=/run/btrfs-headroom
+
+IOSchedulingClass=idle
+Nice=10
+TimeoutStartSec=1min

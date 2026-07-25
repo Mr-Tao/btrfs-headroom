@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+
+[Unit]
+Description=Watch for Btrfs headroom status updates
+Documentation=https://github.com/Mr-Tao/btrfs-headroom
+
+[Path]
+PathChanged=/run/btrfs-headroom/status.ready
+Unit=btrfs-headroom-notify.service
+
+[Install]
+WantedBy=default.target
