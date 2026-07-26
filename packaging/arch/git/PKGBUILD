@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0 OR MIT
 
 pkgname=btrfs-headroom-git
-pkgver=0.1.1.r0.gef5ff48
+pkgver=0.1.1.r1.g441eb4d
 pkgrel=1
 pkgdesc='Read-only Btrfs allocator headroom health check'
 arch=('x86_64')
