@@ -55,15 +55,18 @@ func (c Collector) Collect(paths []string) ([]model.Observation, error) {
 	if len(mounts) == 0 {
 		return nil, errors.New("no Btrfs mounts found")
 	}
+	return collectObservations(mounts, c.collectMount)
+}
 
+func collectObservations(
+	mounts []mount,
+	collect func(mount) (model.Observation, error),
+) ([]model.Observation, error) {
 	byFSID := make(map[string]*model.Observation)
 	for _, mount := range mounts {
-		observation, err := c.collectMount(mount)
+		observation, err := collect(mount)
 		if err != nil {
-			if len(paths) > 0 {
-				return nil, fmt.Errorf("%s: %w", mount.path, err)
-			}
-			continue
+			return nil, fmt.Errorf("%s: %w", mount.path, err)
 		}
 		fsid := observation.Filesystem.FSID
 		if existing, ok := byFSID[fsid]; ok {
@@ -72,9 +75,6 @@ func (c Collector) Collect(paths []string) ([]model.Observation, error) {
 			continue
 		}
 		byFSID[fsid] = &observation
-	}
-	if len(byFSID) == 0 {
-		return nil, errors.New("no readable Btrfs filesystems found")
 	}
 
 	result := make([]model.Observation, 0, len(byFSID))
@@ -235,17 +235,7 @@ func (c Collector) collectMount(mount mount) (model.Observation, error) {
 			Profiles:     []model.Profile{profile},
 		})
 	}
-	for index := range observation.SpaceInfos {
-		space := &observation.SpaceInfos[index]
-		c.readAllocation(sysfsID, space)
-		if (space.Kind == "data" || space.Kind == "metadata" || space.Kind == "system") &&
-			(space.BytesMayUse == nil || space.ChunkSize == nil) {
-			observation.Collection.Warnings = append(
-				observation.Collection.Warnings,
-				fmt.Sprintf("modern sysfs allocation counters unavailable for %s", space.Kind),
-			)
-		}
-	}
+	c.readSpaceAllocations(sysfsID, &observation)
 	sort.Slice(observation.SpaceInfos, func(i, j int) bool {
 		return observation.SpaceInfos[i].Kind < observation.SpaceInfos[j].Kind
 	})
@@ -283,12 +273,22 @@ func (c Collector) collectMount(mount mount) (model.Observation, error) {
 	return observation, nil
 }
 
-func (c Collector) readAllocation(fsid string, space *model.SpaceInfo) {
-	kind := space.Kind
-	if kind == "mixed" {
-		kind = "metadata"
+func (c Collector) readSpaceAllocations(fsid string, observation *model.Observation) {
+	for index := range observation.SpaceInfos {
+		space := &observation.SpaceInfos[index]
+		c.readAllocation(fsid, space)
+		if requiredAllocationCountersMissing(space) {
+			observation.Collection.Warnings = append(
+				observation.Collection.Warnings,
+				fmt.Sprintf("modern sysfs allocation counters unavailable for %s", space.Kind),
+			)
+			observation.Collection.Completeness = "partial"
+		}
 	}
-	root := filepath.Join(c.SysfsRoot, fsid, "allocation", kind)
+}
+
+func (c Collector) readAllocation(fsid string, space *model.SpaceInfo) {
+	root := filepath.Join(c.SysfsRoot, fsid, "allocation", space.Kind)
 	space.BytesMayUse = readByteCount(filepath.Join(root, "bytes_may_use"))
 	space.BytesPinned = readByteCount(filepath.Join(root, "bytes_pinned"))
 	space.BytesReadonly = readByteCount(filepath.Join(root, "bytes_readonly"))
@@ -298,6 +298,15 @@ func (c Collector) readAllocation(fsid string, space *model.SpaceInfo) {
 	space.DiskTotal = readByteCount(filepath.Join(root, "disk_total"))
 	space.DiskUsed = readByteCount(filepath.Join(root, "disk_used"))
 	space.DynamicReclaim = readByteCount(filepath.Join(root, "dynamic_reclaim"))
+}
+
+func requiredAllocationCountersMissing(space *model.SpaceInfo) bool {
+	switch space.Kind {
+	case "data", "metadata", "mixed", "system":
+		return space.BytesMayUse == nil || space.ChunkSize == nil
+	default:
+		return false
+	}
 }
 
 func (c Collector) resolveSysfsID(fsid, metadataUUID string) string {

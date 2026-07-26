@@ -128,6 +128,43 @@ func TestMultipleMetadataProfilesAreUnknown(t *testing.T) {
 	}
 }
 
+func TestUnknownDeviceHeadroomDoesNotProveChunkInfeasibility(t *testing.T) {
+	tests := map[string]func(*model.Device){
+		"missing values": func(device *model.Device) {
+			device.Size = nil
+			device.Allocated = nil
+			device.Unallocated = nil
+		},
+		"zero size": func(device *model.Device) {
+			zero := model.ByteCount(0)
+			device.Size = &zero
+			device.Allocated = &zero
+			device.Unallocated = &zero
+		},
+	}
+	for name, makeUnknown := range tests {
+		t.Run(name, func(t *testing.T) {
+			observation := healthyObservation()
+			makeUnknown(&observation.Devices[0])
+			metadata := &observation.SpaceInfos[0]
+			metadata.LogicalUsed = model.ByteCount(uint64(metadata.LogicalTotal) * 95 / 100)
+
+			health := Evaluate(observation)
+
+			if health.Severity != model.SeverityWarning {
+				t.Fatalf("severity = %q, want %q; reasons: %#v",
+					health.Severity, model.SeverityWarning, health.Reasons)
+			}
+			if reason := findReason(health, "DEVICE_HEADROOM_UNKNOWN"); reason == nil {
+				t.Fatalf("DEVICE_HEADROOM_UNKNOWN reason missing: %#v", health.Reasons)
+			}
+			if reason := findReason(health, "NO_METADATA_CHUNK_HEADROOM"); reason != nil {
+				t.Fatalf("unknown headroom produced NO_METADATA_CHUNK_HEADROOM: %#v", reason)
+			}
+		})
+	}
+}
+
 func TestMissingDeviceIsCritical(t *testing.T) {
 	observation := healthyObservation()
 	missing := true

@@ -40,7 +40,7 @@ func Evaluate(observation model.Observation) model.Health {
 	var unallocated uint64
 	deviceHeadroomKnown := len(observation.Devices) > 0
 	for _, device := range observation.Devices {
-		if device.Size == nil || device.Unallocated == nil {
+		if device.Size == nil || device.Unallocated == nil || *device.Size == 0 {
 			deviceHeadroomKnown = false
 		} else {
 			deviceSize += uint64(*device.Size)
@@ -82,7 +82,10 @@ func Evaluate(observation model.Observation) model.Health {
 			addReason(&health, model.SeverityWarning, "METADATA_PRESSURE",
 				fmt.Sprintf("Metadata pressure is %.1f%%", metadataPressure*100))
 		}
-		if rawChunkCost > 0 && unallocated < rawChunkCost && metadataPressure >= 0.90 {
+		if deviceHeadroomKnown &&
+			rawChunkCost > 0 &&
+			unallocated < rawChunkCost &&
+			metadataPressure >= 0.90 {
 			addReason(&health, model.SeverityCritical, "NO_METADATA_CHUNK_HEADROOM",
 				fmt.Sprintf("Raw headroom cannot fund the estimated %s next metadata chunk",
 					formatBytes(rawChunkCost)))
