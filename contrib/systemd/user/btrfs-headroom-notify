@@ -41,9 +41,26 @@ severity=$(
 
 if [ "$severity" = "ok" ]; then
 	body="All observed Btrfs filesystems are healthy."
+	notification_key=ok
 else
 	body=$(
 		jq -r --arg severity "$severity" '
+			def byte_number:
+				if . == null then null
+				elif type == "number" then .
+				elif type == "string" then (try tonumber catch null)
+				else null
+				end;
+			def byte_text:
+				if . >= 1073741824 then
+					((((. / 1073741824) * 100 | round) / 100) | tostring) + " GiB"
+				elif . >= 1048576 then
+					((((. / 1048576) * 10 | round) / 10) | tostring) + " MiB"
+				elif . >= 1024 then
+					((((. / 1024) * 10 | round) / 10) | tostring) + " KiB"
+				else
+					(tostring) + " B"
+				end;
 			first(
 				.reports[]
 				| select(.health.severity == $severity)
@@ -51,19 +68,106 @@ else
 				| (
 					$report.health.reasons
 					| map(select(.severity == $severity))
-					| .[0].summary
-					// ("Health state is " + $severity)
+					| .[0]
+					// {
+						"code": "",
+						"summary": ("Health state is " + $severity)
+					}
 				  ) as $reason
+				| ($report.observation.devices // []) as $devices
+				| (
+					if ($devices | length) > 0
+					   and all(
+						$devices[];
+						(.unallocated | byte_number) != null
+					   )
+					then
+						[$devices[].unallocated | byte_number] | add
+					else
+						null
+					end
+				  ) as $raw_unallocated
+				| (
+					$report.observation.space_infos // []
+					| map(select(
+						.kind == "metadata" or .kind == "mixed"
+					  ))
+					| .[0]
+				  ) as $metadata
+				| (
+					if $metadata == null
+					   or ($metadata.logical_total | byte_number) == null
+					then
+						null
+					else
+						($metadata.logical_total | byte_number) as $total
+						| ([
+							$metadata.logical_used,
+							$metadata.bytes_may_use,
+							$metadata.bytes_pinned,
+							$metadata.bytes_readonly,
+							$metadata.bytes_reserved,
+							$metadata.bytes_zone_unusable
+						  ]
+						  | map(byte_number // 0)
+						  | add) as $committed
+						| ([($total - $committed), 0] | max)
+					end
+				  ) as $metadata_headroom
+				| (
+					$report.observation.statfs.available
+					| byte_number
+				  ) as $statfs_available
+				| ([
+					if $raw_unallocated != null
+					   and $reason.code != "LOW_UNALLOCATED"
+					then
+						"raw unallocated " +
+						($raw_unallocated | byte_text)
+					else empty end,
+					if $metadata_headroom != null
+					then
+						"metadata free in chunks " +
+						($metadata_headroom | byte_text)
+					else empty end,
+					if $statfs_available != null
+					then
+						"statfs available " +
+						($statfs_available | byte_text)
+					else empty end
+				  ] | join("; ")) as $details
 				| (
 					$report.observation.filesystem.mountpoints[0]
 					// $report.observation.filesystem.fsid
-				  ) + ": " + $reason
+				  ) as $filesystem
+				| ($filesystem + ": " + $reason.summary) +
+				  if $details == ""
+				  then ""
+				  else "\n" + $details
+				  end
 			) // ("Btrfs health is " + $severity)
+		' "$status_file"
+	)
+	notification_key=$(
+		jq -er --arg severity "$severity" '
+			first(
+				.reports[]
+				| select(.health.severity == $severity)
+				| [
+					(.observation.filesystem.fsid // ""),
+					(
+						.health.reasons
+						| map(select(.severity == $severity))
+						| .[0].code // ""
+					)
+				  ]
+				| @tsv
+			) // ("health:" + $severity)
 		' "$status_file"
 	)
 fi
 
-digest=$(printf '%s\000%s' "$severity" "$body" | sha256sum)
+digest=$(printf '%s\000%s' "$severity" "$notification_key" | sha256sum)
 digest=${digest%% *}
 
 previous_severity=

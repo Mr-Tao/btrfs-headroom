@@ -138,8 +138,8 @@ The notifier:
 
 - emits nothing for the first healthy report;
 - notifies on the first warning, critical, or unknown state;
-- replaces its previous notification when severity or the leading reason
-  changes;
+- replaces its previous notification when severity or the leading reason code
+  changes, without repeating alerts for metric-only changes;
 - emits one recovery notification when health returns to OK;
 - stores only a digest, severity, and notification ID below
   `$XDG_RUNTIME_DIR`, preserving them across scans until the user manager
