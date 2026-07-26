@@ -1,39 +1,24 @@
 # Maintainer: Mr. Tao <tao@post.cz>
 # SPDX-License-Identifier: Apache-2.0 OR MIT
 
-pkgname=btrfs-headroom-git
-pkgver=0.1.0.r0.g75697d8
+pkgname=btrfs-headroom
+pkgver=0.1.0
 pkgrel=1
 pkgdesc='Read-only Btrfs allocator headroom health check'
 arch=('x86_64')
 url='https://github.com/Mr-Tao/btrfs-headroom'
 license=('Apache-2.0 OR MIT')
 depends=('glibc' 'systemd')
-makedepends=('git' 'go' 'scdoc')
+makedepends=('go' 'scdoc')
 optdepends=(
   'jq: parse status for the optional desktop notifier'
   'libnotify: send optional desktop notifications'
 )
-provides=("btrfs-headroom=$pkgver")
-conflicts=('btrfs-headroom')
-source=("$pkgname::git+$url.git")
-b2sums=('SKIP')
-
-pkgver() {
-  cd "$pkgname"
-
-  if git describe --long --tags --abbrev=7 --match 'v[0-9]*' >/dev/null 2>&1; then
-    git describe --long --tags --abbrev=7 --match 'v[0-9]*' |
-      sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g'
-  else
-    printf '0.1.0.r%s.g%s' \
-      "$(git rev-list --count HEAD)" \
-      "$(git rev-parse --short=7 HEAD)"
-  fi
-}
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+b2sums=('5e026703f2ac43fc311d2308cdcebd13352ef5b510af34a423a4d44aa0a266c454b7b9e444c27dd572615242aa882f2ea8d6d9d26f4bd026d9cf9f04952c3899')
 
 build() {
-  cd "$pkgname"
+  cd "$pkgname-$pkgver"
 
   export CGO_CPPFLAGS="${CPPFLAGS}"
   export CGO_CFLAGS="${CFLAGS}"
@@ -56,7 +41,7 @@ build() {
 }
 
 check() {
-  cd "$pkgname"
+  cd "$pkgname-$pkgver"
 
   export GOCACHE="$srcdir/go-build-cache"
   export GOMODCACHE="$srcdir/go-mod-cache"
@@ -65,7 +50,7 @@ check() {
 }
 
 package() {
-  cd "$pkgname"
+  cd "$pkgname-$pkgver"
 
   install -Dm0755 btrfs-headroom \
     "$pkgdir/usr/bin/btrfs-headroom"
