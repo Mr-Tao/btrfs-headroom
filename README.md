@@ -8,8 +8,8 @@ headroom. It is designed to warn about the class of ENOSPC failure where
 space to grow a pressured metadata allocation.
 
 The project is in early development. The current CLI and report schema are
-usable for testing, but policy defaults and output details may change before
-the first stable release.
+usable, but policy defaults and output details may change during the 0.x
+release series.
 
 ## Why `df` is not enough
 
@@ -71,9 +71,18 @@ Requirements:
 - a mounted Btrfs filesystem to inspect.
 
 ```console
-$ go build -o btrfs-headroom ./cmd/btrfs-headroom
-$ ./btrfs-headroom version
+$ make build
+$ ./build/bin/btrfs-headroom version
 0.1.0-dev
+```
+
+Release builds inject their version with Go linker flags. The equivalent local
+build is:
+
+```console
+$ make build VERSION=0.1.0
+$ ./build/bin/btrfs-headroom version
+0.1.0
 ```
 
 No `btrfs-progs` executable is required for collection.
@@ -106,6 +115,9 @@ $ btrfs-headroom scan --mountinfo /proc/1/mountinfo
 
 # Block a write-heavy operation at CRITICAL or uncertain health
 $ btrfs-headroom guard --fail-at critical --unknown block /
+
+# Generate completion for the current shell
+$ btrfs-headroom completion zsh
 ```
 
 Flags must precede mount arguments. Supported formats are:
@@ -145,6 +157,29 @@ successful when health becomes warning or critical.
 
 `guard` prints a report but has no `--output` option. It does not run the
 guarded operation itself and cannot mutate the filesystem.
+
+## Shell completion and manual page
+
+`btrfs-headroom completion bash|zsh|fish` writes a completion script to
+standard output. For example:
+
+```console
+$ mkdir -p ~/.local/share/zsh/site-functions
+$ btrfs-headroom completion zsh \
+    > ~/.local/share/zsh/site-functions/_btrfs-headroom
+```
+
+The source for `btrfs-headroom(1)` is
+[docs/man/btrfs-headroom.1.scd](docs/man/btrfs-headroom.1.scd). Generate and
+validate it with `scdoc` and `groff`:
+
+```console
+$ make man
+$ make man-check
+```
+
+Generated documentation and completion files are written under `build/` and
+are not committed.
 
 JSON byte counts are decimal strings so consumers do not lose 64-bit integer
 precision. The current schema identifiers are
@@ -198,10 +233,28 @@ optional desktop notifier are covered in
 
 ## Packaging
 
-An Arch VCS-package template is available at
-[packaging/arch/PKGBUILD](packaging/arch/PKGBUILD). It installs the binary,
-systemd units, notifier helper, documentation, and licenses, but does not
-enable either timer or notifier.
+Arch package templates are maintained under
+[packaging/arch](packaging/arch). They install the binary, systemd units,
+notifier helper, documentation, completions, and licenses, but do not enable
+either timer or notifier.
+
+Tagged `vMAJOR.MINOR.PATCH` releases publish a Linux amd64 archive containing
+the statically linked binary, generated manual page, Bash/Zsh/Fish
+completions, README, and licenses. Each release includes `SHA256SUMS` and a
+GitHub build-provenance attestation. After downloading an archive, verify it
+with:
+
+```console
+$ sha256sum --check SHA256SUMS
+$ gh attestation verify btrfs-headroom-0.1.0-linux-amd64.tar.gz \
+    --repo Mr-Tao/btrfs-headroom
+```
+
+Maintainers can reproduce the archive locally with `scdoc`, GNU tar, and:
+
+```console
+$ make release VERSION=0.1.0
+```
 
 ## Scope
 

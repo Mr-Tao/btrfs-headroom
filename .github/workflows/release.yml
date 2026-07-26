@@ -1,0 +1,98 @@
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.repository == 'Mr-Tao/btrfs-headroom'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Validate release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=${GITHUB_REF_NAME#v}
+          if [[ ! $version =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            printf 'release tag must be vMAJOR.MINOR.PATCH: %s\n' \
+              "$GITHUB_REF_NAME" >&2
+            exit 64
+          fi
+          printf 'VERSION=%s\n' "$version" >> "$GITHUB_ENV"
+
+      - name: Install release tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends \
+            fish groff scdoc shellcheck zsh
+
+      - name: Validate source and generated interfaces
+        run: |
+          make check
+          make test-race
+          make man-check
+          make completions-check
+          make shellcheck
+
+      - name: Build release assets
+        run: make release VERSION="$VERSION"
+
+      - name: Verify checksums and archive contents
+        shell: bash
+        run: |
+          set -euo pipefail
+          (
+            cd dist
+            sha256sum --check SHA256SUMS
+          )
+          archive="dist/btrfs-headroom-${VERSION}-linux-amd64.tar.gz"
+          tar -tzf "$archive" | grep -Fx \
+            "btrfs-headroom-${VERSION}-linux-amd64/btrfs-headroom"
+          tar -tzf "$archive" | grep -Fx \
+            "btrfs-headroom-${VERSION}-linux-amd64/share/man/man1/btrfs-headroom.1"
+
+      - name: Attest release assets
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
+        with:
+          subject-path: "dist/*"
+
+      - name: Preserve workflow artifacts
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: btrfs-headroom-${{ env.VERSION }}-linux-amd64
+          path: |
+            dist/*.tar.gz
+            dist/SHA256SUMS
+          if-no-files-found: error
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            dist/*.tar.gz dist/SHA256SUMS \
+            --verify-tag \
+            --title "btrfs-headroom $VERSION" \
+            --generate-notes

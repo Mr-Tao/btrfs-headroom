@@ -1,4 +1,4 @@
-# Maintainer: btrfs-headroom contributors
+# Maintainer: Mr. Tao <tao@post.cz>
 # SPDX-License-Identifier: Apache-2.0 OR MIT
 
 pkgname=btrfs-headroom-git
@@ -9,7 +9,7 @@ arch=('x86_64')
 url='https://github.com/Mr-Tao/btrfs-headroom'
 license=('Apache-2.0 OR MIT')
 depends=('glibc' 'systemd')
-makedepends=('git' 'go')
+makedepends=('git' 'go' 'scdoc')
 optdepends=(
   'jq: parse status for the optional desktop notifier'
   'libnotify: send optional desktop notifications'
@@ -42,9 +42,15 @@ build() {
   export GOFLAGS='-buildmode=pie -trimpath -mod=readonly -modcacherw -buildvcs=false'
 
   go build \
-    -ldflags="-linkmode=external" \
+    -ldflags="-linkmode=external -X main.version=$pkgver" \
     -o btrfs-headroom \
     ./cmd/btrfs-headroom
+
+  make man
+  mkdir -p build/completions
+  ./btrfs-headroom completion bash >build/completions/btrfs-headroom.bash
+  ./btrfs-headroom completion zsh >build/completions/_btrfs-headroom
+  ./btrfs-headroom completion fish >build/completions/btrfs-headroom.fish
 }
 
 check() {
@@ -57,6 +63,14 @@ package() {
 
   install -Dm0755 btrfs-headroom \
     "$pkgdir/usr/bin/btrfs-headroom"
+  install -Dm0644 build/man/btrfs-headroom.1 \
+    "$pkgdir/usr/share/man/man1/btrfs-headroom.1"
+  install -Dm0644 build/completions/btrfs-headroom.bash \
+    "$pkgdir/usr/share/bash-completion/completions/btrfs-headroom"
+  install -Dm0644 build/completions/_btrfs-headroom \
+    "$pkgdir/usr/share/zsh/site-functions/_btrfs-headroom"
+  install -Dm0644 build/completions/btrfs-headroom.fish \
+    "$pkgdir/usr/share/fish/vendor_completions.d/btrfs-headroom.fish"
 
   install -Dm0644 contrib/systemd/system/btrfs-headroom.service \
     "$pkgdir/usr/lib/systemd/system/btrfs-headroom.service"

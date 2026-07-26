@@ -45,6 +45,7 @@ For Go changes:
 
 ```console
 $ make check
+$ make test-race
 ```
 
 For systemd changes:
@@ -59,11 +60,25 @@ $ systemd-analyze --user verify \
 $ shellcheck contrib/systemd/user/btrfs-headroom-notify
 ```
 
+For documentation and shell completion changes, install `scdoc`, `groff`,
+Bash, Zsh, and Fish, then run:
+
+```console
+$ make man-check
+$ make completions-check
+```
+
+The complete local validation set is:
+
+```console
+$ make check-all
+```
+
 For Arch packaging changes:
 
 ```console
-$ bash -n packaging/arch/PKGBUILD
-$ namcap packaging/arch/PKGBUILD
+$ find packaging/arch -name PKGBUILD -exec bash -n {} \;
+$ find packaging/arch -name PKGBUILD -exec namcap {} \;
 ```
 
 `namcap` is optional for local development but expected before publishing an

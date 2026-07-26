@@ -15,7 +15,7 @@ import (
 	"github.com/Mr-Tao/btrfs-headroom/internal/render"
 )
 
-const version = "0.1.0-dev"
+var version = "0.1.0-dev"
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
@@ -33,6 +33,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runScan(args[1:], true, stdout, stderr)
 	case "guard":
 		return runGuard(args[1:], stdout, stderr)
+	case "completion":
+		return runCompletion(args[1:], stdout, stderr)
 	case "version", "--version", "-version":
 		fmt.Fprintln(stdout, version)
 		return 0
@@ -216,9 +218,10 @@ func atomicOutput(path string) (*os.File, func() error, error) {
 
 func usage(w io.Writer) {
 	fmt.Fprintln(w, `Usage:
-  btrfs-headroom scan  [--format human|json|prometheus] [--output PATH] [MOUNT...]
-  btrfs-headroom check [--format human|json|nagios|prometheus] [MOUNT...]
-  btrfs-headroom guard [--fail-at warning|critical] [--unknown block|allow] [MOUNT...]
+  btrfs-headroom scan  [--format FORMAT] [--output PATH] [--mountinfo PATH] [MOUNT...]
+  btrfs-headroom check [--format FORMAT] [--output PATH] [--mountinfo PATH] [MOUNT...]
+  btrfs-headroom guard [--format FORMAT] [--fail-at LEVEL] [--unknown POLICY] [--mountinfo PATH] [MOUNT...]
+  btrfs-headroom completion bash|zsh|fish
   btrfs-headroom version
 
 scan always exits zero after a valid observation. check maps health to Nagios
