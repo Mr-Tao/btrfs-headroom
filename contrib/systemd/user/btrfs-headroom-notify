@@ -41,7 +41,7 @@ severity=$(
 
 if [ "$severity" = "ok" ]; then
 	body="All observed Btrfs filesystems are healthy."
-	notification_key=ok
+	notification_key=$body
 else
 	body=$(
 		jq -r --arg severity "$severity" '
